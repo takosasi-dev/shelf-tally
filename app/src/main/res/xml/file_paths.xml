@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 撮影の一時ファイルの置き場だけを出す。DB と保存済みの写真は外に出さない。 -->
+    <cache-path name="capture" path="capture/" />
+</paths>

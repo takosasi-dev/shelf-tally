@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- INTERNET の権限は宣言しない。権限が無ければ、通信のコードが紛れ込んでも実行時に失敗する。 -->
+
+    <!-- バーコードの読み取りと、品目の写真の撮影。画像は端末の中だけで処理する -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 低在庫・期限・定期購入のローカル通知(Android 13 以上で許可を求める) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 再起動で消える 1 日 1 回の見回りのアラームを積み直す -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- カメラの無い端末でも入れられるように(CAMERA の権限はカメラ必須を暗に含むため) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.App">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- FR-17: アイコンの長押しで出る「バーコードを読む」「買い物リスト」 -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!-- FR-16: ホーム画面のウィジェット(Jetpack Glance) -->
+        <receiver
+            android:name=".widget.LowStockWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/low_stock_widget_info" />
+        </receiver>
+
+        <!-- FR-09 / FR-12: 1 日 1 回の見回り。AlarmManager と、端末の起動から呼ばれる -->
+        <receiver
+            android:name=".notify.DailyCheckReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- FR-07: カメラのアプリに、撮った写真の一時ファイルを書かせる -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

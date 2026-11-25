@@ -1,0 +1,21 @@
+*.iml
+.gradle/
+.kotlin/
+build/
+.idea/
+.DS_Store
+captures/
+local.properties
+
+# ビルドの順番待ちの記録(作業用)
+.buildq/
+
+# 署名の鍵は入れない。無くても assembleDebug は通る(debug の鍵で署名する)
+keystore/
+keystore.properties
+*.jks
+
+# ビルドでできた物は入れない(配るときは GitHub の Release を使う)
+APK/
+*.apk
+*.aab

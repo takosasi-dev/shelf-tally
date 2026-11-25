@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2 段の棚と箱。上の段は 3 つ、下の段は 1 つだけ残っている(残り少ない)。自分で描いた図形だけ。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 棚板 -->
+    <path
+        android:fillColor="#E8EEF4"
+        android:pathData="M30,50h48v4h-48z M30,74h48v4h-48z" />
+    <!-- 上の段の箱 -->
+    <path
+        android:fillColor="#7BD88F"
+        android:pathData="M33,36h12v14h-12z M48,36h12v14h-12z M63,36h12v14h-12z" />
+    <!-- 下の段の箱(1 つだけ) -->
+    <path
+        android:fillColor="#F5C518"
+        android:pathData="M33,60h12v14h-12z" />
+</vector>

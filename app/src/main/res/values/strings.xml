@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 画面の中の文は Compose 側に日本語で書いている。ここには OS から参照される文字だけを置く。 -->
+<resources>
+    <string name="app_name">ShelfTally</string>
+    <string name="shortcut_scan_short">バーコード</string>
+    <string name="shortcut_scan_long">バーコードを読む</string>
+    <string name="shortcut_shopping_short">買い物リスト</string>
+    <string name="shortcut_shopping_long">買い物リストを開く</string>
+    <string name="widget_label">残り少ない物</string>
+    <string name="widget_description">残りが少ない品目を並べます</string>
+</resources>

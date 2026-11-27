@@ -11,7 +11,8 @@ ShelfTally そのものは MIT(`LICENSE`)です。ビルドのときに次のラ
 | AndroidX Core KTX | 1.13.1 | Apache-2.0 | 通知、FileProvider |
 | AndroidX Lifecycle | 2.8.6 | Apache-2.0 | ViewModel |
 | AndroidX Activity Compose | 1.9.2 | Apache-2.0 | 画面、ファイルや写真の選択 |
-| Jetpack Compose(BOM 2024.10.00: ui / material3 / material-icons-extended) | 2024.10.00 | Apache-2.0 | 画面 |
+| Jetpack Compose(BOM 2024.10.00: ui / material-icons-extended) | 2024.10.00 | Apache-2.0 | 画面 |
+| Compose Material 3(androidx.compose.material3:material3) | 1.5.0-alpha12 | Apache-2.0 | 画面(Material 3 Expressive の部品)。これに引かれて Compose の ui・foundation は 1.8.2、runtime は 1.9.0-rc01 になる |
 | AndroidX Navigation Compose | 2.8.2 | Apache-2.0 | 画面の行き来 |
 | AndroidX Room | 2.6.1 | Apache-2.0 | データの保存 |
 | AndroidX Glance(appwidget / material3) | 1.1.0 | Apache-2.0 | ホーム画面のウィジェット |
@@ -27,6 +28,11 @@ ShelfTally そのものは MIT(`LICENSE`)です。ビルドのときに次のラ
 |---|---|---|
 | JUnit 4 | 4.13.2 | EPL-1.0 |
 | kotlin-test | 2.0.21 | Apache-2.0 |
+| Robolectric(org.robolectric:robolectric) | 4.14.1 | MIT |
+| Roborazzi(io.github.takahirom.roborazzi:roborazzi / roborazzi-compose) | 1.32.2 | Apache-2.0 |
+| Compose UI Test(androidx.compose.ui:ui-test-junit4) | BOM 2024.10.00 | Apache-2.0 |
+
+Robolectric と Roborazzi は、画面を PC の上で画像にして見た目を確かめるために使います(`gradlew testDebugUnitTest -Pshots` のときだけ画像を書く)。
 
 ## 要件定義書から変えた所: ML Kit を使わない
 

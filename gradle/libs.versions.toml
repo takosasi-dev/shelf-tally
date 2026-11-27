@@ -8,6 +8,9 @@ coreKtx = "1.13.1"
 lifecycle = "2.8.6"
 activityCompose = "1.9.2"
 composeBom = "2024.10.00"
+# Material 3 Expressive の部品は 1.5.0 の alpha から外に出ている(1.4.0 では internal)。
+# 1.5.0 の安定版は compileSdk 37・AGP 9.1 が要るので、今の組み合わせで入る alpha に止めている
+material3 = "1.5.0-alpha12"
 navigationCompose = "2.8.2"
 room = "2.6.1"
 coroutines = "1.9.0"
@@ -19,6 +22,9 @@ reorderable = "3.1.0"
 # ShelfTally で足した物(バーコードの読み取り)。ML Kit は使わない
 camerax = "1.5.3"
 zxing = "3.5.4"
+# 画面を PC の上で画像にする(テスト専用)。Kotlin 2.0 の頃の版に合わせてある
+roborazzi = "1.32.2"
+robolectric = "4.14.1"
 junit = "4.13.2"
 androidxTestJunit = "1.2.1"
 androidxTestRunner = "1.6.2"
@@ -35,7 +41,7 @@ compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
@@ -61,6 +67,10 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 
+roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }

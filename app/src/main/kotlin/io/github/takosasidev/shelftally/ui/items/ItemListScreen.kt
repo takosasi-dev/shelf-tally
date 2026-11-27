@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 
 package io.github.takosasidev.shelftally.ui.items
 
@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,7 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,10 +42,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
@@ -53,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -65,8 +69,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,6 +91,7 @@ import io.github.takosasidev.shelftally.core.calc.ItemQuery
 import io.github.takosasidev.shelftally.core.calc.ItemSort
 import io.github.takosasidev.shelftally.core.calc.LevelFilter
 import io.github.takosasidev.shelftally.core.calc.Stock
+import io.github.takosasidev.shelftally.core.calc.StockLevel
 import io.github.takosasidev.shelftally.core.model.Category
 import io.github.takosasidev.shelftally.core.model.ChangeType
 import io.github.takosasidev.shelftally.core.model.ConsumptionLog
@@ -88,11 +101,12 @@ import io.github.takosasidev.shelftally.ui.ShelfViewModel
 import io.github.takosasidev.shelftally.ui.components.AmountDialog
 import io.github.takosasidev.shelftally.ui.components.EmptyState
 import io.github.takosasidev.shelftally.ui.components.ItemThumb
+import io.github.takosasidev.shelftally.ui.components.groupShape
 import io.github.takosasidev.shelftally.ui.components.StepButton
 import io.github.takosasidev.shelftally.ui.components.StockBar
 import io.github.takosasidev.shelftally.ui.components.stockText
 import io.github.takosasidev.shelftally.ui.theme.LocalStockColors
-import io.github.takosasidev.shelftally.ui.theme.onColor
+import io.github.takosasidev.shelftally.ui.theme.categoryTones
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -150,23 +164,13 @@ fun ItemListScreen(vm: ShelfViewModel, onOpen: (Long) -> Unit, onAdd: () -> Unit
         }
     }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val activeCount = allItems.count { !it.isArchived }
     Scaffold(
+        // 検索中は普通のバーなので、縮む動きをつながない(つなぐと最初のスワイプが見えない縮みに取られる)
+        modifier = if (searching) Modifier else Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = {
-                    if (searching) {
-                        TextField(
-                            value = query.text,
-                            onValueChange = { vm.query.value = query.copy(text = it) },
-                            placeholder = { Text("品名で検索") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    } else {
-                        Text("在庫")
-                    }
-                },
-                actions = {
+            val actions: @Composable RowScope.() -> Unit = {
                     IconButton(onClick = {
                         if (searching) vm.query.value = query.copy(text = "")
                         searching = !searching
@@ -197,11 +201,36 @@ fun ItemListScreen(vm: ShelfViewModel, onOpen: (Long) -> Unit, onAdd: () -> Unit
                         }
                     }
                     IconButton(onClick = onScan) { Icon(Icons.Filled.QrCodeScanner, contentDescription = "バーコードを読む") }
-                },
-            )
+            }
+            if (searching) {
+                TopAppBar(
+                    title = {
+                        TextField(
+                            value = query.text,
+                            onValueChange = { vm.query.value = query.copy(text = it) },
+                            placeholder = { Text("品名で検索") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                    actions = actions,
+                )
+            } else {
+                // 大きな見出しの下に、今の在庫の要約を出す。スクロールすると細いバーに縮む
+                LargeFlexibleTopAppBar(
+                    title = { Text("在庫") },
+                    subtitle = { Text(if (lowCount > 0) "$activeCount 品目 ・ 少ない物が $lowCount 品" else "$activeCount 品目 ・ どれも足りています") },
+                    actions = actions,
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAdd) { Icon(Icons.Filled.Add, contentDescription = "品目を追加") }
+            ExtendedFloatingActionButton(
+                onClick = onAdd,
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                text = { Text("品目を追加") },
+            )
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -226,12 +255,13 @@ fun ItemListScreen(vm: ShelfViewModel, onOpen: (Long) -> Unit, onAdd: () -> Unit
                     onAction = { vm.query.value = ItemQuery(sort = query.sort) },
                 )
 
+                // 1 つのまとまりとして見せる(端だけ大きく丸め、間は細い隙間)
                 mode == ViewMode.LIST -> LazyColumn(
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 88.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
-                    items(rows, key = { it.item.id }) { row ->
-                        ItemRow(row, today, onOpen = { onOpen(row.item.id) }, onStep = { onStep(row.item, it) })
+                    itemsIndexed(rows, key = { _, it -> it.item.id }) { index, row ->
+                        ItemRow(row, today, groupShape(index, rows.size), onOpen = { onOpen(row.item.id) }, onStep = { onStep(row.item, it) })
                     }
                 }
 
@@ -360,9 +390,9 @@ private fun <T> MenuChip(label: String, selected: Boolean, options: List<Pair<T,
     }
 }
 
-/** リストの 1 行。右へスワイプで ＋、左へスワイプで −(行は元の位置に戻る)。 */
+/** リストの 1 行。右へスワイプで ＋、左へスワイプで −(行は元の位置に戻る)。[shape] はまとまりの中の位置で変わる。 */
 @Composable
-private fun ItemRow(row: RowData, today: LocalDate, onOpen: () -> Unit, onStep: (ChangeType) -> Unit) {
+private fun ItemRow(row: RowData, today: LocalDate, shape: Shape, onOpen: () -> Unit, onStep: (ChangeType) -> Unit) {
     // スワイプの状態は最初の onStep を覚えてしまうので、常に最新の物を呼ぶ
     val currentOnStep by rememberUpdatedState(onStep)
     val dismissState = rememberSwipeToDismissBoxState(
@@ -381,7 +411,7 @@ private fun ItemRow(row: RowData, today: LocalDate, onOpen: () -> Unit, onStep: 
         backgroundContent = {
             val adding = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
             Row(
-                Modifier.fillMaxSize().clip(CardDefaults.shape)
+                Modifier.fillMaxSize().clip(shape)
                     .background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (adding) Arrangement.Start else Arrangement.End,
@@ -394,13 +424,13 @@ private fun ItemRow(row: RowData, today: LocalDate, onOpen: () -> Unit, onStep: 
             }
         },
     ) {
-        Card(onClick = onOpen, colors = cardColors(row.expiry), modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                ItemThumb(row.item, row.category, 56.dp)
-                Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(row.item.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Card(onClick = onOpen, shape = shape, colors = cardColors(row.expiry), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                ItemThumb(row.item, row.category, 52.dp)
+                Column(Modifier.weight(1f).padding(start = 14.dp, end = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(row.item.name, style = MaterialTheme.typography.titleMediumEmphasized, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Tags(row)
-                    StockBar(row.item, row.logs)
+                    StockBar(row.item, row.logs, Modifier.padding(vertical = 4.dp))
                     StatusLines(row, today)
                 }
                 StepButton(Icons.Filled.Remove, "減らす", enabled = row.item.currentQuantity > 0.0) { onStep(ChangeType.CONSUME) }
@@ -413,10 +443,11 @@ private fun ItemRow(row: RowData, today: LocalDate, onOpen: () -> Unit, onStep: 
 /** グリッドの 1 枚。写真を大きく見せる。 */
 @Composable
 private fun ItemCell(row: RowData, today: LocalDate, onOpen: () -> Unit, onStep: (ChangeType) -> Unit) {
-    Card(onClick = onOpen, colors = cardColors(row.expiry)) {
-        ItemThumb(row.item, row.category, 160.dp, Modifier.fillMaxWidth().aspectRatio(1.3f), reqPx = 256)
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(row.item.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Card(onClick = onOpen, shape = RoundedCornerShape(24.dp), colors = cardColors(row.expiry)) {
+        // サムネイルはカードの内側に余白を取って置く(角の丸みはカードより一段小さく)
+        ItemThumb(row.item, row.category, 120.dp, Modifier.padding(6.dp).fillMaxWidth().aspectRatio(1.3f), reqPx = 256, corner = 18.dp)
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(row.item.name, style = MaterialTheme.typography.titleSmallEmphasized, maxLines = 1, overflow = TextOverflow.Ellipsis)
             StockBar(row.item, row.logs)
             StatusLines(row, today)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -427,41 +458,50 @@ private fun ItemCell(row: RowData, today: LocalDate, onOpen: () -> Unit, onStep:
     }
 }
 
-/** 期限切れの品目はカードの地の色を変えて目立たせる(FR-09)。文字でも「期限切れ」と書く。 */
+/**
+ * 期限切れの品目はカードの地の色を変えて目立たせる(FR-09)。文字でも「期限切れ」と書く。
+ * ダークの errorContainer は濃い赤で浮くので、カードの地へ半分寄せる。
+ */
 @Composable
 private fun cardColors(expiry: ExpiryStatus) =
     if (expiry == ExpiryStatus.EXPIRED) {
-        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        val scheme = MaterialTheme.colorScheme
+        val dark = scheme.surface.luminance() < 0.5f
+        CardDefaults.cardColors(
+            containerColor = if (dark) lerp(scheme.surfaceContainerHighest, scheme.errorContainer, 0.5f) else scheme.errorContainer,
+        )
     } else {
         CardDefaults.cardColors()
     }
 
+/** 「日用品 ・ 洗面所」。カテゴリはサムネイルと同じ色の文字にして、色の札を重ねない。 */
 @Composable
 private fun Tags(row: RowData) {
     val category = row.category
     val location = row.item.locationTag
     if (category == null && location == null) return
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (category != null) {
-            val color = Color(category.colorArgb)
-            Text(
-                category.name,
-                style = MaterialTheme.typography.labelSmall,
-                color = onColor(color),
-                maxLines = 1,
-                modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(color).padding(horizontal = 6.dp, vertical = 2.dp),
-            )
-        }
-        if (location != null) {
-            Text(location, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        }
-    }
+    val categoryColor = category?.let { categoryTones(Color(it.colorArgb)).second }
+    Text(
+        buildAnnotatedString {
+            if (category != null) withStyle(SpanStyle(color = categoryColor!!, fontWeight = FontWeight.Medium)) { append(category.name) }
+            if (category != null && location != null) append(" ・ ")
+            if (location != null) append(location)
+        },
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /** 残りの数と割合、予測、期限。色だけでなく文字で書く。 */
 @Composable
 private fun StatusLines(row: RowData, today: LocalDate) {
-    Text(stockText(row.item, row.logs), style = MaterialTheme.typography.bodySmall)
+    Text(
+        stockText(row.item, row.logs),
+        style = MaterialTheme.typography.bodySmall,
+        color = if (Stock.level(row.item) == StockLevel.OUT) MaterialTheme.colorScheme.error else Color.Unspecified,
+    )
     row.forecast?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

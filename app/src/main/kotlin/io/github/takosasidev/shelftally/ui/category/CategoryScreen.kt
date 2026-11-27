@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,15 +24,16 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Category as CategoryIcon
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -50,7 +52,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.takosasidev.shelftally.core.model.Category
 import io.github.takosasidev.shelftally.ui.ShelfViewModel
 import io.github.takosasidev.shelftally.ui.components.EmptyState
+import io.github.takosasidev.shelftally.ui.components.groupShape
 import io.github.takosasidev.shelftally.ui.theme.ThemeColorChoices
+import io.github.takosasidev.shelftally.ui.theme.categoryTones
 
 /**
  * FR-13: カテゴリの作成・編集・削除・並び替えと、色の設定。
@@ -73,36 +77,51 @@ fun CategoryScreen(vm: ShelfViewModel, onBack: () -> Unit) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                editing = Category(name = "", colorArgb = ThemeColorChoices.first().second.toArgb(), sortOrder = 0)
-            }) { Icon(Icons.Filled.Add, contentDescription = "カテゴリを追加") }
+            ExtendedFloatingActionButton(
+                onClick = { editing = Category(name = "", colorArgb = ThemeColorChoices.first().second.toArgb(), sortOrder = 0) },
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                text = { Text("カテゴリを追加") },
+            )
         },
     ) { padding ->
         if (categories.isEmpty()) {
-            EmptyState(Icons.Filled.CategoryIcon,"カテゴリがありません", "右下の ＋ から作れます。", Modifier.padding(padding))
+            EmptyState(Icons.Filled.CategoryIcon, "カテゴリがありません", "右下の「カテゴリを追加」から作れます。", Modifier.padding(padding))
         } else {
-            LazyColumn(Modifier.padding(padding), contentPadding = PaddingValues(bottom = 88.dp)) {
+            LazyColumn(
+                Modifier.padding(padding),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
                 itemsIndexed(categories, key = { _, c -> c.id }) { index, category ->
-                    Row(
-                        Modifier.clickable { editing = category }.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    Surface(
+                        onClick = { editing = category },
+                        shape = groupShape(index, categories.size),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Box(Modifier.size(28.dp).clip(CircleShape).background(Color(category.colorArgb)))
-                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                            Text(category.name, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                "${items.count { it.categoryId == category.id }} 件の品目",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // 品目のアイコンと同じ「淡い地+濃い色」で、カテゴリの色を見せる
+                            val (bg, fg) = categoryTones(Color(category.colorArgb))
+                            Box(Modifier.size(40.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
+                                Box(Modifier.size(16.dp).clip(CircleShape).background(fg))
+                            }
+                            Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                                Text(category.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    "${items.count { it.categoryId == category.id }} 件の品目",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            val muted = MaterialTheme.colorScheme.onSurfaceVariant
+                            IconButton(enabled = index > 0, onClick = { vm.act { moveCategory(category.id, up = true) } }) {
+                                Icon(Icons.Filled.ArrowUpward, contentDescription = "上へ")
+                            }
+                            IconButton(enabled = index < categories.lastIndex, onClick = { vm.act { moveCategory(category.id, up = false) } }) {
+                                Icon(Icons.Filled.ArrowDownward, contentDescription = "下へ")
+                            }
+                            IconButton(onClick = { deleting = category }) { Icon(Icons.Outlined.Delete, contentDescription = "削除", tint = muted) }
                         }
-                        IconButton(enabled = index > 0, onClick = { vm.act { moveCategory(category.id, up = true) } }) {
-                            Icon(Icons.Filled.ArrowUpward, contentDescription = "上へ")
-                        }
-                        IconButton(enabled = index < categories.lastIndex, onClick = { vm.act { moveCategory(category.id, up = false) } }) {
-                            Icon(Icons.Filled.ArrowDownward, contentDescription = "下へ")
-                        }
-                        IconButton(onClick = { deleting = category }) { Icon(Icons.Filled.Delete, contentDescription = "削除") }
                     }
                 }
             }

@@ -40,6 +40,14 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            // 画面の画像は `-Pshots` を付けたときだけ撮る(app/build/outputs/roborazzi/)。付けなければ撮影のテストは素通りする
+            all { if (project.hasProperty("shots")) it.systemProperty("roborazzi.test.record", "true") }
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -83,4 +91,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
 }

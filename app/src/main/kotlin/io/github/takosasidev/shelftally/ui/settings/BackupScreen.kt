@@ -16,6 +16,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -135,71 +141,101 @@ fun BackupScreen(vm: ShelfViewModel, onBack: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(
-            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 12.dp, end = 12.dp, bottom = 24.dp),
         ) {
-            Header("書き出す")
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "品目・カテゴリ・履歴・買い物リスト・設定・写真を 1 つの zip にします。",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("パスワード(任意)") },
-                    supportingText = { Text("入れると zip を暗号化します(AES-256)。忘れると読み込めません") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Button(enabled = !busy, onClick = { createBackup.launch(BackupManager.manualFileName()) }) { Text("zip に書き出す") }
-            }
-
-            Header("読み込む")
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("今のデータを全部消して、バックアップの中身に入れ替えます。", style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(enabled = !busy, onClick = { openBackup.launch(arrayOf(BackupManager.ZIP_MIME, "application/octet-stream")) }) {
-                    Text("zip を選んで読み込む")
-                }
-            }
-
-            Header("自動バックアップ")
-            val s = loaded
-            if (s != null) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("アプリを開いたときに自動で取る")
+            Group("書き出す", {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LeadingIcon(Icons.Outlined.Upload)
                         Text(
-                            "前のバックアップから決めた日数が過ぎていたら、開いたときに保存先へ書き出します(パスワードなし)。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            "品目・カテゴリ・履歴・買い物リスト・設定・写真を 1 つの zip にします。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 16.dp),
                         )
                     }
-                    Switch(checked = s.autoBackupEnabled, onCheckedChange = { on -> vm.act { updateSettings { it.copy(autoBackupEnabled = on) } } })
-                }
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("保存先: ${treeName ?: "未設定"}", Modifier.weight(1f))
-                    TextButton(onClick = { pickTree.launch(null) }) { Text("選ぶ") }
-                }
-                Stepper("間隔", s.autoBackupIntervalDays, 1..90, "日ごと") { v -> vm.act { updateSettings { it.copy(autoBackupIntervalDays = v) } } }
-                Stepper("残す数", s.autoBackupKeepCount, 1..30, "個") { v -> vm.act { updateSettings { it.copy(autoBackupKeepCount = v) } } }
-                Text(
-                    "最後の自動バックアップ: ${s.lastAutoBackupAt?.let(StampFmt::format) ?: "まだありません"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                if (s.autoBackupEnabled && treeName == null) {
-                    Text(
-                        "保存先のフォルダを選ぶまで、自動バックアップは取られません。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 16.dp),
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("パスワード(任意)") },
+                        supportingText = { Text("入れると zip を暗号化します(AES-256)。忘れると読み込めません") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
                     )
+                    Button(enabled = !busy, onClick = { createBackup.launch(BackupManager.manualFileName()) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("zip に書き出す")
+                    }
                 }
-                autoError?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp))
+            })
+
+            Group("読み込む", {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LeadingIcon(Icons.Outlined.Download)
+                        Text(
+                            "今のデータを全部消して、バックアップの中身に入れ替えます。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 16.dp),
+                        )
+                    }
+                    OutlinedButton(
+                        enabled = !busy,
+                        onClick = { openBackup.launch(arrayOf(BackupManager.ZIP_MIME, "application/octet-stream")) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("zip を選んで読み込む") }
+                }
+            })
+
+            val s = loaded
+            if (s != null) {
+                Group(
+                    "自動バックアップ",
+                    {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            LeadingIcon(Icons.Outlined.Schedule)
+                            Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                                Text("開いたときに自動で取る", style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    "前のバックアップから決めた日数が過ぎていたら、開いたときに保存先へ書き出します(パスワードなし)。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = s.autoBackupEnabled, onCheckedChange = { on -> vm.act { updateSettings { it.copy(autoBackupEnabled = on) } } })
+                        }
+                    },
+                    {
+                        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            LeadingIcon(Icons.Outlined.Folder)
+                            Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                                Text("保存先", style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    treeName ?: "未設定",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (s.autoBackupEnabled && treeName == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            TextButton(onClick = { pickTree.launch(null) }) { Text("選ぶ") }
+                        }
+                    },
+                    { Stepper("間隔", s.autoBackupIntervalDays, 1..90, "日ごと", Icons.Outlined.Event) { v -> vm.act { updateSettings { it.copy(autoBackupIntervalDays = v) } } } },
+                    { Stepper("残す数", s.autoBackupKeepCount, 1..30, "個", Icons.Outlined.Inventory2) { v -> vm.act { updateSettings { it.copy(autoBackupKeepCount = v) } } } },
+                )
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "最後の自動バックアップ: ${s.lastAutoBackupAt?.let(StampFmt::format) ?: "まだありません"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (s.autoBackupEnabled && treeName == null) {
+                        Text(
+                            "保存先のフォルダを選ぶまで、自動バックアップは取られません。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    autoError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                 }
             }
         }

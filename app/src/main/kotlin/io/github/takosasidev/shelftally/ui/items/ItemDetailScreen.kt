@@ -11,7 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Shape
+import io.github.takosasidev.shelftally.ui.components.groupShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -27,6 +31,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -192,6 +197,7 @@ fun ItemDetailScreen(vm: ShelfViewModel, itemId: Long, onBack: () -> Unit, onEdi
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DetailBody(
     item: Item,
@@ -218,7 +224,7 @@ private fun DetailBody(
                 )
                 Text(
                     Format.quantity(item.currentQuantity, item.unit),
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.displaySmallEmphasized,
                     color = stockColor(Stock.level(item)),
                 )
                 Text(stockText(item, logs), style = MaterialTheme.typography.bodyMedium)
@@ -230,90 +236,96 @@ private fun DetailBody(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             StepButton(Icons.Filled.Remove, "減らす", enabled = item.currentQuantity > 0.0) { onStep(ChangeType.CONSUME) }
             StepButton(Icons.Filled.Add, "増やす") { onStep(ChangeType.RESTOCK) }
-            OutlinedButton(onClick = { onAmount(ChangeType.CONSUME) }, enabled = item.currentQuantity > 0.0) { Text("使った量") }
-            Button(onClick = { onAmount(ChangeType.RESTOCK) }) { Text("補充") }
-        }
-
-        Section("残量の予測") {
-            Text(Forecast.label(Forecast.remainingDays(item.currentQuantity, logs, zone), item.currentQuantity))
-        }
-
-        item.expiryDate?.let { date ->
-            val status = Expiry.status(date, today, leadDays)
-            Section("期限") {
-                Text(
-                    "${DateFmt.format(date)}(${Expiry.label(date, today)})",
-                    color = when (status) {
-                        ExpiryStatus.EXPIRED -> MaterialTheme.colorScheme.error
-                        ExpiryStatus.SOON -> LocalStockColors.current.low
-                        else -> Color.Unspecified
-                    },
-                )
+            Spacer(Modifier.width(4.dp))
+            OutlinedButton(onClick = { onAmount(ChangeType.CONSUME) }, enabled = item.currentQuantity > 0.0, modifier = Modifier.weight(1f)) {
+                Text("使った量")
             }
+            Button(onClick = { onAmount(ChangeType.RESTOCK) }, modifier = Modifier.weight(1f)) { Text("補充") }
         }
 
-        Recurring.nextDue(item)?.let { due ->
-            Section("定期購入") {
-                Text("${item.recurringPurchaseIntervalDays}日ごと。次のお知らせは ${DateFmt.format(due.atZone(zone))} ごろ")
-            }
-        }
-
-        item.barcodeValue?.let { Section("バーコード") { Text(it) } }
-
-        Section("購入の記録") {
-            val interval = Stats.averagePurchaseIntervalDays(logs)
-            Text(if (interval != null) "約${interval.roundToInt().coerceAtLeast(1)}日ごとに購入" else "購入の頻度は、補充を 2 回記録すると出ます")
-            val prices = Stats.priceHistory(logs, zone).takeLast(8)
-            if (prices.isEmpty()) {
-                Text(
-                    "補充のときに金額を入れると、価格の推移が出ます",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                val max = prices.maxOf { it.price }.coerceAtLeast(1)
-                prices.forEach { p ->
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                        Text(DateFmt.format(p.date), style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(88.dp))
-                        Box(Modifier.weight(1f)) {
-                            Box(
-                                Modifier.fillMaxWidth(p.price.toFloat() / max).height(10.dp)
-                                    .clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.primary),
-                            )
-                        }
-                        Text(
-                            "${Format.yen(p.price)} / ${Format.quantity(p.amount, item.unit)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
-                }
-            }
-        }
-
-        if (logs.isNotEmpty()) {
-            Section("最近の記録") {
-                logs.take(10).forEach { log ->
-                    val sign = if (log.changeType == ChangeType.CONSUME) "−" else "＋"
-                    val price = log.price?.let { "(${Format.yen(it)})" }.orEmpty()
+        // 欄は 1 つのまとまりとして並べる(出す欄の数で端の角が決まる)
+        val sections = buildList<Pair<String, @Composable () -> Unit>> {
+            add("残量の予測" to { Text(Forecast.label(Forecast.remainingDays(item.currentQuantity, logs, zone), item.currentQuantity)) })
+            item.expiryDate?.let { date ->
+                val status = Expiry.status(date, today, leadDays)
+                add("期限" to {
                     Text(
-                        "${DateFmt.format(log.recordedAt.atZone(zone))}  $sign${Format.quantity(log.changeAmount, item.unit)}$price",
-                        style = MaterialTheme.typography.bodySmall,
+                        "${DateFmt.format(date)}(${Expiry.label(date, today)})",
+                        color = when (status) {
+                            ExpiryStatus.EXPIRED -> MaterialTheme.colorScheme.error
+                            ExpiryStatus.SOON -> LocalStockColors.current.low
+                            else -> Color.Unspecified
+                        },
+                    )
+                })
+            }
+            Recurring.nextDue(item)?.let { due ->
+                add("定期購入" to { Text("${item.recurringPurchaseIntervalDays}日ごと。次のお知らせは ${DateFmt.format(due.atZone(zone))} ごろ") })
+            }
+            item.barcodeValue?.let { add("バーコード" to { Text(it) }) }
+            add("購入の記録" to { PurchaseHistory(item, logs, zone) })
+            if (logs.isNotEmpty()) add("最近の記録" to { RecentLogs(item, logs, zone) })
+        }
+        Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            sections.forEachIndexed { i, (title, body) -> Section(title, groupShape(i, sections.size), body) }
+        }
+    }
+}
+
+@Composable
+private fun PurchaseHistory(item: Item, logs: List<ConsumptionLog>, zone: ZoneId) {
+    val interval = Stats.averagePurchaseIntervalDays(logs)
+    Text(if (interval != null) "約${interval.roundToInt().coerceAtLeast(1)}日ごとに購入" else "購入の頻度は、補充を 2 回記録すると出ます")
+    val prices = Stats.priceHistory(logs, zone).takeLast(8)
+    if (prices.isEmpty()) {
+        Text(
+            "補充のときに金額を入れると、価格の推移が出ます",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        val max = prices.maxOf { it.price }.coerceAtLeast(1)
+        prices.forEach { p ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                Text(DateFmt.format(p.date), style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(88.dp))
+                // 棒の後ろに枠を敷いて、いちばん高い値までの長さを見せる
+                Box(Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
+                    Box(
+                        Modifier.fillMaxWidth(p.price.toFloat() / max).fillMaxHeight()
+                            .clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.primary),
                     )
                 }
+                Text(
+                    "${Format.yen(p.price)} / ${Format.quantity(p.amount, item.unit)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+private fun RecentLogs(item: Item, logs: List<ConsumptionLog>, zone: ZoneId) {
+    logs.take(10).forEach { log ->
+        val sign = if (log.changeType == ChangeType.CONSUME) "−" else "＋"
+        val price = log.price?.let { "(${Format.yen(it)})" }.orEmpty()
+        Text(
+            "${DateFmt.format(log.recordedAt.atZone(zone))}  $sign${Format.quantity(log.changeAmount, item.unit)}$price",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun Section(title: String, shape: Shape, content: @Composable () -> Unit) {
+    Card(Modifier.fillMaxWidth(), shape = shape) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmallEmphasized, color = MaterialTheme.colorScheme.primary)
             content()
         }
     }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,7 +31,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Shape
+import io.github.takosasidev.shelftally.ui.components.groupShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +68,7 @@ import io.github.takosasidev.shelftally.core.model.Category
 import io.github.takosasidev.shelftally.core.model.Item
 import io.github.takosasidev.shelftally.data.PhotoStore
 import io.github.takosasidev.shelftally.ui.ShelfViewModel
+import io.github.takosasidev.shelftally.ui.components.ItemIconLabels
 import io.github.takosasidev.shelftally.ui.components.ItemIcons
 import io.github.takosasidev.shelftally.ui.components.ItemThumb
 import io.github.takosasidev.shelftally.ui.nav.Routes
@@ -185,22 +191,24 @@ private fun EditForm(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        // 入力欄は意味ごとのまとまりに分ける(端だけ大きく丸めたまとまり)
         Column(
-            Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState())
+                .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            // --- 写真 ---
+          FormSection("写真とアイコン", groupShape(0, 5)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ItemThumb(
                     Item(name = name, photoUri = photo, iconKey = iconKey, createdAt = Instant.EPOCH),
                     categories.firstOrNull { it.id == categoryId },
                     72.dp,
                 )
-                OutlinedButton(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) {
+                FilledTonalButton(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) {
                     Icon(Icons.Filled.PhotoCamera, contentDescription = null)
                     Text("撮る", Modifier.padding(start = 6.dp))
                 }
-                OutlinedButton(onClick = {
+                FilledTonalButton(onClick = {
                     pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }) {
                     Icon(Icons.Filled.Image, contentDescription = null)
@@ -210,7 +218,21 @@ private fun EditForm(
                     IconButton(onClick = { photo = null }) { Icon(Icons.Filled.Close, contentDescription = "写真を外す") }
                 }
             }
+            // アイコン(写真が無いときに出る)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ItemIcons.forEachIndexed { index, (key, icon) ->
+                    FilterChip(
+                        // 既定(未設定)は先頭のアイコン
+                        selected = iconKey == key || (iconKey == null && index == 0),
+                        onClick = { iconKey = key },
+                        // 保存するキーは英語なので、読み上げには日本語の名前を渡す
+                        label = { Icon(icon, contentDescription = ItemIconLabels[key] ?: key) },
+                    )
+                }
+            }
+          }
 
+          FormSection("基本", groupShape(1, 5)) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -243,7 +265,9 @@ private fun EditForm(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
             )
+          }
 
+          FormSection("分類と場所", groupShape(2, 5)) {
             PickField(
                 label = "カテゴリ",
                 text = categories.firstOrNull { it.id == categoryId }?.name ?: "未分類",
@@ -253,8 +277,9 @@ private fun EditForm(
 
             // FR-08: 前に入れた保管場所を候補に出す
             SuggestField(location, { location = it }, "保管場所(例: キッチン)", locations, Modifier.fillMaxWidth())
+          }
 
-            // --- 期限 ---
+          FormSection("期限と定期購入", groupShape(3, 5)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(onClick = { showDatePicker = true }) {
                     Icon(Icons.Filled.Event, contentDescription = null)
@@ -274,7 +299,9 @@ private fun EditForm(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
+          }
 
+          FormSection("バーコード", groupShape(4, 5)) {
             OutlinedTextField(
                 value = barcodeText,
                 onValueChange = { barcodeText = it },
@@ -282,19 +309,7 @@ private fun EditForm(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-
-            // --- アイコン(写真が無いときに出る)---
-            Text("アイコン", style = MaterialTheme.typography.labelLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ItemIcons.forEachIndexed { index, (key, icon) ->
-                    FilterChip(
-                        // 既定(未設定)は先頭のアイコン
-                        selected = iconKey == key || (iconKey == null && index == 0),
-                        onClick = { iconKey = key },
-                        label = { Icon(icon, contentDescription = key) },
-                    )
-                }
-            }
+          }
         }
     }
 
@@ -314,6 +329,17 @@ private fun EditForm(
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("キャンセル") } },
         ) { DatePicker(state = pickerState) }
+    }
+}
+
+/** 入力欄のまとまり。見出しと中身を、角の丸い面に載せる。 */
+@Composable
+private fun FormSection(title: String, shape: Shape, content: @Composable ColumnScope.() -> Unit) {
+    Surface(Modifier.fillMaxWidth(), shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            content()
+        }
     }
 }
 

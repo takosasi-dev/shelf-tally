@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 
 package io.github.takosasidev.shelftally.ui.shopping
 
@@ -18,12 +18,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -31,8 +34,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -43,7 +49,9 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,8 +64,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -74,6 +86,7 @@ import io.github.takosasidev.shelftally.core.model.ShoppingListEntry
 import io.github.takosasidev.shelftally.data.Purchase
 import io.github.takosasidev.shelftally.ui.ShelfViewModel
 import io.github.takosasidev.shelftally.ui.components.EmptyState
+import io.github.takosasidev.shelftally.ui.components.groupShape
 import kotlinx.coroutines.launch
 
 /**
@@ -107,10 +120,15 @@ fun ShoppingScreen(vm: ShelfViewModel) {
         vm.act { setChecked(entry.id, !entry.isChecked) }
     }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val remaining = entries.size - checked.size
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text("買い物リスト") },
+                subtitle = { Text(if (entries.isEmpty()) "今は買う物がありません" else "あと $remaining 件 ・ カゴに ${checked.size} 件") },
+                scrollBehavior = scrollBehavior,
                 actions = {
                     IconButton(onClick = { pickingItem = true }) {
                         Icon(Icons.Filled.Inventory2, contentDescription = "在庫の品目から追加")
@@ -130,20 +148,31 @@ fun ShoppingScreen(vm: ShelfViewModel) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = newLabel,
-                    onValueChange = { newLabel = it },
-                    placeholder = { Text("在庫に無い買い物を足す(例: お菓子)") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { addFree() }),
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = addFree, enabled = newLabel.isNotBlank()) {
-                    Icon(Icons.Filled.Add, contentDescription = "追加")
-                }
-            }
+            // 丸い入力欄。追加のボタンは欄の中に置き、文字があるときだけ押せる
+            TextField(
+                value = newLabel,
+                onValueChange = { newLabel = it },
+                placeholder = { Text("在庫に無い買い物を足す(例: お菓子)") },
+                leadingIcon = { Icon(Icons.Filled.AddShoppingCart, contentDescription = null) },
+                trailingIcon = {
+                    if (newLabel.isNotBlank()) {
+                        FilledIconButton(onClick = addFree, modifier = Modifier.padding(end = 4.dp)) {
+                            Icon(Icons.Filled.Add, contentDescription = "追加")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(28.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { addFree() }),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            )
 
             if (entries.isEmpty()) {
                 EmptyState(
@@ -155,11 +184,16 @@ fun ShoppingScreen(vm: ShelfViewModel) {
                     onAction = { pickingItem = true },
                 )
             } else {
-                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 8.dp)) {
-                    items(entries, key = { it.id }) { entry ->
+                LazyColumn(
+                    Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    itemsIndexed(entries, key = { _, it -> it.id }) { index, entry ->
                         EntryRow(
                             entry = entry,
                             item = entry.itemId?.let(itemById::get),
+                            shape = groupShape(index, entries.size),
                             onToggle = { toggle(entry) },
                             onDelete = { vm.act { deleteEntry(entry.id) } },
                         )
@@ -221,7 +255,7 @@ fun ShoppingScreen(vm: ShelfViewModel) {
 
 /** 買い物リストの 1 行。どちらへスワイプしてもチェックが切り替わる。チェックすると取り消し線が左から伸びる。 */
 @Composable
-private fun EntryRow(entry: ShoppingListEntry, item: Item?, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun EntryRow(entry: ShoppingListEntry, item: Item?, shape: Shape, onToggle: () -> Unit, onDelete: () -> Unit) {
     val currentOnToggle by rememberUpdatedState(onToggle)
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -237,13 +271,13 @@ private fun EntryRow(entry: ShoppingListEntry, item: Item?, onToggle: () -> Unit
         state = dismissState,
         backgroundContent = {
             Box(
-                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 20.dp),
+                Modifier.fillMaxSize().clip(shape).background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterStart,
             ) { Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer) }
         },
     ) {
-        Surface(Modifier.fillMaxWidth()) {
-            Row(Modifier.clickable(onClick = onToggle).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Surface(Modifier.fillMaxWidth(), shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Row(Modifier.clickable(onClick = onToggle).padding(start = 6.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = entry.isChecked, onCheckedChange = { onToggle() })
                 Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
                     Text(
@@ -266,7 +300,9 @@ private fun EntryRow(entry: ShoppingListEntry, item: Item?, onToggle: () -> Unit
                         Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "リストから消す") }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "リストから消す", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }

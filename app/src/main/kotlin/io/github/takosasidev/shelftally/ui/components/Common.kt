@@ -6,8 +6,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -29,8 +28,10 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Soap
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -45,9 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -65,7 +66,7 @@ import io.github.takosasidev.shelftally.core.model.Category
 import io.github.takosasidev.shelftally.core.model.ConsumptionLog
 import io.github.takosasidev.shelftally.core.model.Item
 import io.github.takosasidev.shelftally.data.PhotoLoader
-import io.github.takosasidev.shelftally.ui.theme.onColor
+import io.github.takosasidev.shelftally.ui.theme.categoryTones
 import io.github.takosasidev.shelftally.ui.theme.stockColor
 import kotlin.math.roundToInt
 
@@ -81,6 +82,12 @@ val ItemIcons: List<Pair<String, ImageVector>> = listOf(
     "medicine" to Icons.Filled.Medication,
 )
 
+/** 読み上げに渡すアイコンの名前(保存するキーは英語なので、そのまま読ませない)。 */
+val ItemIconLabels: Map<String, String> = mapOf(
+    "box" to "箱", "cleaning" to "掃除", "soap" to "石けん", "food" to "食べ物",
+    "drink" to "飲み物", "kitchen" to "台所", "pet" to "ペット", "medicine" to "薬",
+)
+
 fun itemIcon(key: String?): ImageVector = ItemIcons.firstOrNull { it.first == key }?.second ?: ItemIcons.first().second
 
 /**
@@ -88,30 +95,35 @@ fun itemIcon(key: String?): ImageVector = ItemIcons.firstOrNull { it.first == ke
  * 写真のファイルが端末から消えていても落ちない(PhotoLoader が null を返す)。
  */
 @Composable
-fun ItemThumb(item: Item, category: Category?, size: Dp, modifier: Modifier = Modifier, reqPx: Int = 192) {
+fun ItemThumb(item: Item, category: Category?, size: Dp, modifier: Modifier = Modifier, reqPx: Int = 192, corner: Dp = size * 0.28f) {
     val context = LocalContext.current
     val name = item.photoUri
     var bitmap by remember(name) { mutableStateOf<ImageBitmap?>(name?.let { PhotoLoader.cached(it, reqPx)?.asImageBitmap() }) }
     LaunchedEffect(name) {
         if (name != null && bitmap == null) bitmap = PhotoLoader.decodeSampled(context, name, reqPx)?.asImageBitmap()
     }
-    val background = category?.let { Color(it.colorArgb) } ?: MaterialTheme.colorScheme.surfaceContainerHighest
+    val (background, foreground) = category?.let { categoryTones(Color(it.colorArgb)) }
+        ?: (MaterialTheme.colorScheme.surfaceContainerHighest to MaterialTheme.colorScheme.onSurfaceVariant)
     Box(
-        modifier.size(size).clip(RoundedCornerShape(12.dp)).background(background),
+        modifier.size(size).clip(RoundedCornerShape(corner)).background(background),
         contentAlignment = Alignment.Center,
     ) {
         val shown = bitmap
         if (shown != null) {
             Image(shown, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
-            Icon(
-                itemIcon(item.iconKey),
-                contentDescription = null,
-                tint = if (category != null) onColor(background) else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(size * 0.5f),
-            )
+            Icon(itemIcon(item.iconKey), contentDescription = null, tint = foreground, modifier = Modifier.size(size * 0.48f))
         }
     }
+}
+
+/** まとまったリストの 1 枚の角。端だけ大きく丸め、間は小さくする(Android 16 の設定の画面と同じ形)。 */
+fun groupShape(index: Int, count: Int): Shape {
+    val big = 24.dp
+    val small = 6.dp
+    val top = if (index == 0) big else small
+    val bottom = if (index == count - 1) big else small
+    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
 }
 
 /**
@@ -122,10 +134,13 @@ fun ItemThumb(item: Item, category: Category?, size: Dp, modifier: Modifier = Mo
 fun StockBar(item: Item, logs: List<ConsumptionLog>, modifier: Modifier = Modifier) {
     val ratio by animateFloatAsState(Stock.ratio(item, logs), tween(400), label = "stockRatio")
     val color by animateColorAsState(stockColor(Stock.level(item)), tween(400), label = "stockColor")
+    // 隙間と右端の点(M3 の既定)は消す。行ごとに点だけ浮いて見えるため
     LinearProgressIndicator(
         progress = { ratio },
         color = color,
-        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        trackColor = MaterialTheme.colorScheme.secondaryContainer,
+        gapSize = 0.dp,
+        drawStopIndicator = {},
         modifier = modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
     )
 }
@@ -136,22 +151,22 @@ fun stockText(item: Item, logs: List<ConsumptionLog>): String = when (Stock.leve
     else -> "残り ${Format.quantity(item.currentQuantity, item.unit)}(${(Stock.ratio(item, logs) * 100).roundToInt()}%)"
 }
 
-/** ＋/− のボタン。押している間だけ少し縮む。タップの領域は 48dp。 */
+/**
+ * ＋/− のボタン。押している間は丸から角丸の四角へ形が変わる(Expressive)。
+ * 大きさは M3 の既定のまま(見た目 40dp、タップの領域は M3 が 48dp を保つ。NFR-03)。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun StepButton(icon: ImageVector, description: String, enabled: Boolean = true, onClick: () -> Unit) {
     val haptic = LocalHapticFeedback.current
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.85f else 1f, label = "stepScale")
     FilledTonalIconButton(
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         },
         enabled = enabled,
-        interactionSource = interaction,
-        modifier = Modifier.size(48.dp).scale(scale),
-    ) { Icon(icon, contentDescription = description) }
+        shapes = IconButtonDefaults.shapes(),
+    ) { Icon(icon, contentDescription = description, modifier = Modifier.size(20.dp)) }
 }
 
 /** 量(と、補充なら任意で価格)を入力させる。量り売りの単位の増減と、まとめての補充に使う。 */
@@ -215,7 +230,11 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(72.dp))
+        // 記号は淡い丸の上に置く(大きな記号だけが浮かないように)
+        Box(
+            Modifier.size(112.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(52.dp)) }
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
         Text(
             body,

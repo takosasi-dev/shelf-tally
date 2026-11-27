@@ -1,5 +1,7 @@
 package io.github.takosasidev.shelftally
 
+import android.view.ViewGroup
+import android.os.Build
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -86,6 +88,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Android 8.1(API 27)までは、OS が画面の最初の入力欄へ勝手にフォーカスを渡し、キーボードが出る。
+        // 入れ物の側でフォーカスを受けて、入力欄には押した時だけ渡す
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            findViewById<ViewGroup>(android.R.id.content).apply {
+                isFocusable = true
+                isFocusableInTouchMode = true
+                descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+            }
+        }
         // 回転などで作り直されたときは、同じ Intent をもう一度処理しない
         // (ショートカットで開いた後に回すたび、バーコードの画面へ飛び直してしまう)
         if (savedInstanceState == null) pendingIntent.value = intent

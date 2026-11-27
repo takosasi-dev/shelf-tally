@@ -6,7 +6,7 @@
 
 - パッケージ名: `io.github.takosasidev.shelftally`
 - **完全オフライン。`INTERNET` の権限を宣言していません。** 記録と写真は端末の中だけに保存し、外へ送りません。バーコードの画像も端末の中だけで処理します。
-- Android 8.0(API 26)以上
+- Android 7.0(API 24)以上
 
 ## 機能
 

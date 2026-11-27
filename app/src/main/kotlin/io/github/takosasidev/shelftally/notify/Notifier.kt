@@ -1,5 +1,6 @@
 package io.github.takosasidev.shelftally.notify
 
+import android.os.Build
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -79,9 +80,11 @@ object Notifier {
         if (!manager.areNotificationsEnabled()) return false
 
         // API 26 以上はチャンネルが要る。同じ ID で作り直しても、利用者が変えた設定は壊れない
-        context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
-            NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT),
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
+                NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT),
+            )
+        }
 
         val id = baseId + (item.id % 100_000).toInt()
         // requestCode を通知ごとに変える。PendingIntent の同一判定は extras を見ないので、

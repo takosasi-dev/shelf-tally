@@ -19,6 +19,7 @@ ShelfTally そのものは MIT(`LICENSE`)です。ビルドのときに次のラ
 | AndroidX CameraX(camera-core / camera-camera2 / camera-lifecycle / camera-view) | 1.5.3 | Apache-2.0 | バーコードの読み取りのカメラ |
 | ZXing core(com.google.zxing:core) | 3.5.4 | Apache-2.0 | バーコードの読み取り |
 | Zip4j(net.lingala.zip4j:zip4j) | 2.11.5 | Apache-2.0 | バックアップの zip と暗号化 |
+| desugar_jdk_libs(com.android.tools:desugar_jdk_libs) | 2.1.5 | GPL-2.0 with Classpath Exception | Android 7.x で java.time などを使うための、OpenJDK 由来の写し(D8 がアプリに入れる) |
 
 これらが依存する AndroidX のライブラリ(WorkManager など)も一緒に入ります。どれも Apache-2.0 です。
 

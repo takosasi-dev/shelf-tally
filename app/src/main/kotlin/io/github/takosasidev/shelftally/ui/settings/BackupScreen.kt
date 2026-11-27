@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,7 +79,9 @@ fun BackupScreen(vm: ShelfViewModel, onBack: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     val loaded by vm.settings.collectAsStateWithLifecycle()
 
-    var password by remember { mutableStateOf("") }
+    // 保存先を選ぶ画面にいる間に画面が作り直される(回転など)と、remember の値は消えるのに結果は届く。
+    // パスワードが空に戻ると、黙って暗号化なしの zip を書いてしまうので、作り直しを越えて保つ
+    var password by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var stage by remember { mutableStateOf<ImportStage?>(null) }
     var treeName by remember { mutableStateOf(BackupManager.treeUri(context)?.let { BackupManager.treeDisplayName(context, it) }) }

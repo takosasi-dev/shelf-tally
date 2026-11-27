@@ -62,17 +62,34 @@ object Stock {
     }
 
     /**
-     * 「満タン」の見積もり。最大量の列は無いので、これまでの最大の残量と、閾値の 3 倍の大きい方を使う。
+     * 「満タン」の見積もり(要件定義書 §7)。最大量の列は無いので、これまでの最大の残量を使う。
+     * 閾値を超えたことが 1 度も無い品目(少ないまま登録した物)は、最大の残量が満タンとは言えないので、閾値の 3 倍で代える。
+     * 大きい方を取ると、3 個で登録した品目の満タンが「持ったことのない 6 個」になり、割合の意味が通らない。
      * どちらも 0 のときは 1(残量バーの割り算のため)。
      */
     fun fullAmount(item: Item, logs: List<ConsumptionLog>): Double {
-        val full = maxOf(peakQuantity(item.currentQuantity, logs), item.lowStockThreshold * 3)
+        val peak = peakQuantity(item.currentQuantity, logs)
+        val full = if (peak > item.lowStockThreshold) peak else item.lowStockThreshold * 3
         return if (full > 0.0) full else 1.0
     }
 
     /** 残量バーの長さ(0〜1)。 */
     fun ratio(item: Item, logs: List<ConsumptionLog>): Float =
         (item.currentQuantity / fullAmount(item, logs)).coerceIn(0.0, 1.0).toFloat()
+
+    /**
+     * 一覧と詳細に出す文。「在庫切れ」「残り 3 個(満タン)」「残り 2 個(満タン 3 個の 67%)」。
+     * 割合だけを書くと何に対する割合か分からないので、分母(満タンの見積もり)も書く。
+     */
+    fun label(item: Item, logs: List<ConsumptionLog>): String {
+        if (level(item) == StockLevel.OUT) return "在庫切れ"
+        val left = "残り ${Format.quantity(item.currentQuantity, item.unit)}"
+        val full = fullAmount(item, logs)
+        if (item.currentQuantity >= full) return "$left(満タン)"
+        // 満タンでも在庫切れでもないのに「100%」「0%」と丸めて書かない
+        val percent = Math.round(ratio(item, logs) * 100).coerceIn(1, 99)
+        return "$left(満タン ${Format.quantity(full, item.unit)}の $percent%)"
+    }
 
     /** 「購入完了」で提案する補充の量。満タンまでの差。差が無ければ 1 タップの幅、それも無ければ満タンの量。 */
     fun suggestedRestock(item: Item, logs: List<ConsumptionLog>): Double {

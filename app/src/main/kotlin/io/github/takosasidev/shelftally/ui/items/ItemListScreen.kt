@@ -81,6 +81,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.takosasidev.shelftally.core.calc.Expiry
 import io.github.takosasidev.shelftally.core.calc.ExpiryStatus
@@ -139,7 +140,8 @@ fun ItemListScreen(vm: ShelfViewModel, onOpen: (Long) -> Unit, onAdd: () -> Unit
     var searching by rememberSaveable { mutableStateOf(false) }
     var sortMenu by remember { mutableStateOf(false) }
     var amountFor by remember { mutableStateOf<Pair<Item, ChangeType>?>(null) }
-    val today = remember { LocalDate.now() }
+    // 開いた時点の日付で固めない。MainActivity が戻るたびに読み直す
+    val today by vm.today.collectAsStateWithLifecycle()
     val zone = remember { ZoneId.systemDefault() }
     val categoryById = remember(categories) { categories.associateBy { it.id } }
     val lowCount = allItems.count { !it.isArchived && Stock.isLow(it) }
@@ -150,7 +152,7 @@ fun ItemListScreen(vm: ShelfViewModel, onOpen: (Long) -> Unit, onAdd: () -> Unit
         if (step == null) amountFor = item to type else vm.act { changeQuantity(item.id, type, step) }
     }
 
-    val rows = remember(items, categoryById, logsByItem, leadDays) {
+    val rows = remember(items, categoryById, logsByItem, leadDays, today) {
         items.map { item ->
             val logs = logsByItem[item.id].orEmpty()
             val result = Forecast.remainingDays(item.currentQuantity, logs, zone)
@@ -299,6 +301,11 @@ fun ItemListScreen(vm: ShelfViewModel, onOpen: (Long) -> Unit, onAdd: () -> Unit
 private fun NotificationBanner() {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
+    // 設定のアプリで許可して(または切って)戻ってきたときに、お知らせが古いまま残らないよう、戻るたびに読み直す
+    LifecycleResumeEffect(context) {
+        enabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        onPauseOrDispose { }
+    }
     var dismissed by rememberSaveable { mutableStateOf(false) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         enabled = granted

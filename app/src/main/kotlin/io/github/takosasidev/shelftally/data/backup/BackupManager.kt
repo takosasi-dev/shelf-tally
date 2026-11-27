@@ -240,6 +240,9 @@ object BackupManager {
         staging.listFiles()?.forEach { src ->
             runCatching {
                 val dst = File(target, src.name)
+                // 同じ名前の写真が既にあれば上書きしない。入れ替えが途中で失敗して DB が元に戻っても、
+                // 今の品目の写真が差し替わったままにならないように(名前は UUID なので、同じ名前は同じ写真)
+                if (dst.exists()) return@runCatching
                 if (!src.renameTo(dst)) src.inputStream().use { input -> FileOutputStream(dst).use { input.copyTo(it) } }
             }
         }
@@ -283,7 +286,14 @@ object BackupManager {
             val parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))
             val target = DocumentsContract.createDocument(context.contentResolver, parent, ZIP_MIME, fileName)
                 ?: throw IllegalStateException("保存先のフォルダにファイルを作れませんでした")
-            exportToUri(context, target, password)
+            try {
+                exportToUri(context, target, password)
+            } catch (e: Exception) {
+                // 失敗や取り消しで、空や途中までの zip を残さない。残すと世代の数に入って、読める古い zip のほうが
+                // 先に消される。消すのはここで作ったファイルだけ(手動の書き出しで選ばれた既存のファイルは消さない)
+                runCatching { DocumentsContract.deleteDocument(context.contentResolver, target) }
+                throw e
+            }
             target
         }
 

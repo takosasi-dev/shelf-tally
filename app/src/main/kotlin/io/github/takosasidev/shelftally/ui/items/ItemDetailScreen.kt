@@ -92,6 +92,7 @@ fun ItemDetailScreen(vm: ShelfViewModel, itemId: Long, onBack: () -> Unit, onEdi
     val categories by vm.categories.collectAsStateWithLifecycle()
     val logsByItem by vm.logsByItem.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val today by vm.today.collectAsStateWithLifecycle()
     val item = items.firstOrNull { it.id == itemId }
     val logs = logsByItem[itemId].orEmpty()
 
@@ -155,6 +156,7 @@ fun ItemDetailScreen(vm: ShelfViewModel, itemId: Long, onBack: () -> Unit, onEdi
                 logs = logs,
                 category = categories.firstOrNull { it.id == item.categoryId },
                 leadDays = settings?.expiryAlertLeadDays ?: 3,
+                today = today,
                 modifier = Modifier.padding(padding),
                 onStep = { type ->
                     val step = Stock.defaultStep(item.unit)
@@ -204,12 +206,12 @@ private fun DetailBody(
     logs: List<ConsumptionLog>,
     category: Category?,
     leadDays: Int,
+    today: LocalDate,
     modifier: Modifier,
     onStep: (ChangeType) -> Unit,
     onAmount: (ChangeType) -> Unit,
 ) {
     val zone = remember { ZoneId.systemDefault() }
-    val today = remember { LocalDate.now() }
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -232,7 +234,8 @@ private fun DetailBody(
         }
         StockBar(item, logs)
         Text(
-            "${Format.quantity(item.lowStockThreshold, item.unit)} 以下になるとお知らせします",
+            "${Format.quantity(item.lowStockThreshold, item.unit)} 以下になるとお知らせします。" +
+                "満タンは、これまでで一番多かった残量です(それがお知らせの量以下なら、お知らせの量の 3 倍)。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -11,6 +11,8 @@ import io.github.takosasidev.shelftally.data.ShelfRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -25,7 +27,10 @@ object DailyCheck {
     private const val PREFS = "notify_state"
     private const val KEY_EXPIRY_NOTIFIED = "expiryNotified"
 
-    suspend fun run(context: Context) {
+    /** 起動時の見回りとアラームが重なっても、同じ品目を 2 回通知しない(後の分は、前の分が付けた印を見る)。 */
+    private val mutex = Mutex()
+
+    suspend fun run(context: Context): Unit = mutex.withLock {
         val repo = ShelfRepository.get(context)
         val items = repo.itemsOnce()
         val settings = repo.settingsOnce()
@@ -83,9 +88,13 @@ class DailyCheckReceiver : BroadcastReceiver() {
         val appContext = context.applicationContext
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            runCatching { DailyCheck.run(appContext) }
-            DailyCheckScheduler.schedule(appContext)
-            pending.finish()
+            try {
+                runCatching { DailyCheck.run(appContext) }
+                DailyCheckScheduler.schedule(appContext)
+            } finally {
+                // 何が起きても終わりを知らせる(知らせないと、OS がこのアプリを「応答なし」と数える)
+                pending.finish()
+            }
         }
     }
 }

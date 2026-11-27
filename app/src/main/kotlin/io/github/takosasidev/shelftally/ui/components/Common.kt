@@ -61,14 +61,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.takosasidev.shelftally.core.calc.Format
 import io.github.takosasidev.shelftally.core.calc.Stock
-import io.github.takosasidev.shelftally.core.calc.StockLevel
 import io.github.takosasidev.shelftally.core.model.Category
 import io.github.takosasidev.shelftally.core.model.ConsumptionLog
 import io.github.takosasidev.shelftally.core.model.Item
 import io.github.takosasidev.shelftally.data.PhotoLoader
 import io.github.takosasidev.shelftally.ui.theme.categoryTones
 import io.github.takosasidev.shelftally.ui.theme.stockColor
-import kotlin.math.roundToInt
 
 /** `Item.iconKey` の候補。キーは DB に入るので、後から名前を変えない。先頭が既定。 */
 val ItemIcons: List<Pair<String, ImageVector>> = listOf(
@@ -145,11 +143,8 @@ fun StockBar(item: Item, logs: List<ConsumptionLog>, modifier: Modifier = Modifi
     )
 }
 
-/** 「残り 2 個(33%)」「在庫切れ」。 */
-fun stockText(item: Item, logs: List<ConsumptionLog>): String = when (Stock.level(item)) {
-    StockLevel.OUT -> "在庫切れ"
-    else -> "残り ${Format.quantity(item.currentQuantity, item.unit)}(${(Stock.ratio(item, logs) * 100).roundToInt()}%)"
-}
+/** 「残り 2 個(満タン 3 個の 67%)」「在庫切れ」。文は :core で作る(テストできるように)。 */
+fun stockText(item: Item, logs: List<ConsumptionLog>): String = Stock.label(item, logs)
 
 /**
  * ＋/− のボタン。押している間は丸から角丸の四角へ形が変わる(Expressive)。

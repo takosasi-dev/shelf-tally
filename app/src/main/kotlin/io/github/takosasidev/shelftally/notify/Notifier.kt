@@ -50,6 +50,21 @@ object Notifier {
         body = "${item.recurringPurchaseIntervalDays ?: 0}日ごとの定期購入のお知らせです。",
     )
 
+    /**
+     * 出したままの通知を片付ける。品目を消した後に残すと、開いても何も出ない。
+     * データを入れ替えた(復元)後に残すと、同じ id の別の品目が開く。[itemId] が null なら全部。
+     */
+    fun cancel(context: Context, itemId: Long?) {
+        runCatching {
+            val manager = NotificationManagerCompat.from(context)
+            if (itemId == null) {
+                manager.cancelAll()
+            } else {
+                listOf(BASE_LOW, BASE_EXPIRY, BASE_RECURRING).forEach { manager.cancel(it + (itemId % 100_000).toInt()) }
+            }
+        }
+    }
+
     @SuppressLint("MissingPermission") // areNotificationsEnabled() で確かめ、失敗も握っている
     private fun show(
         context: Context,

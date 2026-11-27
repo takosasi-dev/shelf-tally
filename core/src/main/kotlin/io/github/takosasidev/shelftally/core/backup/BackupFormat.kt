@@ -263,6 +263,7 @@ object BackupFormat {
      * - 同じ id の行は最初の 1 つだけ
      * - 無いカテゴリを指す品目は未分類に
      * - 無い品目を指す履歴は捨てる。買い物リストの行は一時の買い物(itemId = null)として残す
+     * - 同じ品目を指す買い物リストの行は最初の 1 つだけ
      */
     fun sanitize(c: BackupContent): BackupContent {
         val categories = c.categories.distinctBy { it.id }
@@ -270,12 +271,15 @@ object BackupFormat {
         val items = c.items.distinctBy { it.id }
             .map { if (it.categoryId != null && it.categoryId !in categoryIds) it.copy(categoryId = null) else it }
         val itemIds = items.map { it.id }.toSet()
+        val listed = mutableSetOf<Long>()
         return c.copy(
             categories = categories,
             items = items,
             logs = c.logs.distinctBy { it.id }.filter { it.itemId in itemIds },
             shopping = c.shopping.distinctBy { it.id }
-                .map { if (it.itemId != null && it.itemId !in itemIds) it.copy(itemId = null) else it },
+                .map { if (it.itemId != null && it.itemId !in itemIds) it.copy(itemId = null) else it }
+                // 1 つの品目の行は 1 つだけ(FR-04 の重複なし)。2 つあると購入完了の画面で同じ品目が並んで落ちる
+                .filter { it.itemId == null || listed.add(it.itemId) },
         )
     }
 

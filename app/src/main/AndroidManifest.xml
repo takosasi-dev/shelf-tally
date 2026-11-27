@@ -50,12 +50,14 @@
                 android:resource="@xml/low_stock_widget_info" />
         </receiver>
 
-        <!-- FR-09 / FR-12: 1 日 1 回の見回り。AlarmManager と、端末の起動から呼ばれる -->
+        <!-- FR-09 / FR-12: 1 日 1 回の見回り。AlarmManager と、端末の起動、アプリの更新から呼ばれる
+             (アラームは再起動で消える。更新の後も、開かないままでも見回りが続くように積み直す。積み直しは何度でも害が無い) -->
         <receiver
             android:name=".notify.DailyCheckReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

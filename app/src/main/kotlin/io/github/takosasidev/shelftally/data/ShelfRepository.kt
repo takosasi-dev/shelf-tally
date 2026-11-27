@@ -101,6 +101,7 @@ class ShelfRepository private constructor(context: Context) {
     /** FR-27: 品目を消す。履歴と買い物リストの行は外部キーで一緒に消える。 */
     suspend fun deleteItem(id: Long) {
         itemDao.deleteById(id)
+        Notifier.cancel(appContext, id)
         prunePhotos()
         LowStockWidget.refresh(appContext)
     }
@@ -224,6 +225,8 @@ class ShelfRepository private constructor(context: Context) {
             shoppingDao.insertAll(clean.shopping.map { it.toEntity() })
             settingsDao.upsert(clean.settings.copy(lastAutoBackupAt = lastAuto).toEntity())
         }
+        // 前のデータの通知を残すと、タップで同じ id の別の品目が開く
+        Notifier.cancel(appContext, null)
         prunePhotos()
         LowStockWidget.refresh(appContext)
     }

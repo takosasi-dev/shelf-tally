@@ -53,9 +53,20 @@ class ShelfViewModel(val repo: ShelfRepository) : ViewModel() {
     /** 一覧の表示の形。null の間は設定の既定に従う(FR-23)。 */
     val viewMode = MutableStateFlow<ViewMode?>(null)
 
+    /**
+     * 期限の表示と絞り込みに使う「今日」。開いた時点の日付のままにすると、日をまたいで開きっぱなしにしたとき
+     * 期限の残り日数がずれるので、画面に戻るたびに [refreshToday] で読み直す(同じ日なら何も起きない)。
+     */
+    private val _today = MutableStateFlow(LocalDate.now())
+    val today: StateFlow<LocalDate> = _today
+
+    fun refreshToday() {
+        _today.value = LocalDate.now()
+    }
+
     val visibleItems: StateFlow<List<Item>> =
-        combine(repo.items, query, repo.settings) { all, q, s ->
-            ItemFilter.apply(all, q, LocalDate.now(), s.expiryAlertLeadDays)
+        combine(repo.items, query, repo.settings, _today) { all, q, s, day ->
+            ItemFilter.apply(all, q, day, s.expiryAlertLeadDays)
         }.flowOn(Dispatchers.Default).state(emptyList())
 
     /** 結果を待たない書き込み。画面は `vm.act { changeQuantity(...) }` のように呼ぶ。 */

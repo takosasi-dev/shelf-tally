@@ -2,6 +2,9 @@ package io.github.takosasidev.shelftally.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -31,6 +34,7 @@ import io.github.takosasidev.shelftally.core.calc.Stock
 import io.github.takosasidev.shelftally.core.calc.StockLevel
 import io.github.takosasidev.shelftally.core.model.Item
 import io.github.takosasidev.shelftally.data.ShelfRepository
+import kotlinx.coroutines.flow.catch
 
 /** FR-16: ホーム画面のウィジェット。低在庫の品目を並べ、タップでアプリを開く。 */
 class LowStockWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -48,16 +52,23 @@ object LowStockWidget : GlanceAppWidget() {
     }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // provideContent は戻ってこないので、DB の読み取りは必ずその前に済ませ、失敗も握る。
+        // 最初の 1 回は provideContent の前に読み、失敗も握る。
         // ここで投げるとホーム画面に「読み込めません」が出る。
-        val low = runCatching {
-            ShelfRepository.get(context).itemsOnce()
-                .filter { !it.isArchived && Stock.isLow(it) }
-                .sortedWith(compareBy<Item> { Stock.level(it).ordinal }.thenBy { it.name })
-        }.getOrNull()
+        val repo = ShelfRepository.get(context)
+        val first = runCatching { repo.itemsOnce() }.getOrNull()
 
-        provideContent { Body(low) }
+        provideContent {
+            // 描いている間(Glance のセッションが生きている数十秒)は、updateAll を呼んでも provideGlance は
+            // 呼び直されない。先に読んだ一覧だけを描くと、続けて − を押した 2 回目(ちょうど低在庫に変わる回)が
+            // 映らないので、DB の変化をここで見る。
+            val items by remember { repo.items.catch { } }.collectAsState(first)
+            Body(items?.let(::lowOf))
+        }
     }
+
+    private fun lowOf(items: List<Item>): List<Item> =
+        items.filter { !it.isArchived && Stock.isLow(it) }
+            .sortedWith(compareBy<Item> { Stock.level(it).ordinal }.thenBy { it.name })
 }
 
 @Composable

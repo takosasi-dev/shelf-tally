@@ -105,22 +105,42 @@ class StockTest {
     }
 
     @Test
-    fun `満タンは最大の残量と閾値の3倍の大きい方、どちらも0なら1`() {
+    fun `満タンは閾値を超えた最大の残量、超えたことが無ければ閾値の3倍、どちらも0なら1`() {
+        // 少ないまま登録した品目。最大の残量(1)は満タンと言えない
         assertEquals(6.0, Stock.fullAmount(item(qty = 1.0, threshold = 2.0), emptyList()))
+        assertEquals(6.0, Stock.fullAmount(item(qty = 2.0, threshold = 2.0), emptyList()))
+        // 3 個で登録したら満タンは 3 個(閾値の 3 倍の 6 個にしない)
+        assertEquals(3.0, Stock.fullAmount(item(qty = 3.0, threshold = 2.0), emptyList()))
         assertEquals(10.0, Stock.fullAmount(item(qty = 10.0, threshold = 2.0), emptyList()))
         assertEquals(1.0, Stock.fullAmount(item(qty = 0.0, threshold = 0.0), emptyList()))
     }
 
     @Test
     fun `残量バーは0から1に収まる`() {
-        assertEquals(0.5f, Stock.ratio(item(qty = 3.0, threshold = 2.0), emptyList()))
+        assertEquals(1f, Stock.ratio(item(qty = 3.0, threshold = 2.0), emptyList()))
         assertEquals(0f, Stock.ratio(item(qty = 0.0, threshold = 0.0), emptyList()))
         assertEquals(1f, Stock.ratio(item(qty = 9.0, threshold = 2.0), emptyList()))
     }
 
     @Test
+    fun `残りの文は分母の満タンも書く`() {
+        val used1 = listOf(log(ChangeType.CONSUME, 1.0, 1))
+        assertEquals("残り 3 個(満タン)", Stock.label(item(qty = 3.0, threshold = 2.0), emptyList()))
+        // 3 個から 1 個使った。満タンは 3 個のまま
+        assertEquals("残り 2 個(満タン 3 個の 67%)", Stock.label(item(qty = 2.0, threshold = 2.0), used1))
+        // 低在庫のまま登録した品目を 100% と書かない
+        assertEquals("残り 1 個(満タン 6 個の 17%)", Stock.label(item(qty = 1.0, threshold = 2.0), emptyList()))
+        assertEquals("在庫切れ", Stock.label(item(qty = 0.0, threshold = 2.0), used1))
+        // 丸めで 0% や 100% にしない(1000 個から 1 個使った・999 個から 998 個使った)
+        assertEquals("残り 999 個(満タン 1000 個の 99%)", Stock.label(item(qty = 999.0, threshold = 2.0), listOf(log(ChangeType.CONSUME, 1.0, 1))))
+        assertEquals("残り 1 個(満タン 999 個の 1%)", Stock.label(item(qty = 1.0, threshold = 0.0), listOf(log(ChangeType.CONSUME, 998.0, 1))))
+    }
+
+    @Test
     fun `購入完了の提案は満タンまでの差。差が無ければ1タップの幅`() {
         assertEquals(5.0, Stock.suggestedRestock(item(qty = 1.0, threshold = 2.0), emptyList()))
+        // 3 個から 2 個使った。提案は元の 3 個に戻す 2 個
+        assertEquals(2.0, Stock.suggestedRestock(item(qty = 1.0, threshold = 2.0), listOf(log(ChangeType.CONSUME, 2.0, 1))))
         assertEquals(1.0, Stock.suggestedRestock(item(qty = 6.0, threshold = 2.0), emptyList()))
         // 量り売りは幅が無いので満タンの量
         assertEquals(600.0, Stock.suggestedRestock(item(qty = 600.0, threshold = 200.0, unit = "g"), emptyList()))

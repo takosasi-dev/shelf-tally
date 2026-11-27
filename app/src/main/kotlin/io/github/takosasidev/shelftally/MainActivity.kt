@@ -34,8 +34,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -64,8 +64,16 @@ import io.github.takosasidev.shelftally.ui.settings.SettingsScreen
 import io.github.takosasidev.shelftally.ui.shopping.ShoppingScreen
 import io.github.takosasidev.shelftally.ui.stats.StatsScreen
 import io.github.takosasidev.shelftally.ui.theme.ShelfTallyTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+
+/**
+ * 起動時の処理を動かす場所。画面の lifecycleScope で動かすと、回転などの作り直しで自動バックアップの
+ * 書き出しが途中で切られる。作り直しのたびに重ねて走らないことは、AutoBackup と DailyCheck の側で守る。
+ */
+private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 class MainActivity : ComponentActivity() {
 
@@ -78,16 +86,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        pendingIntent.value = intent
+        // 回転などで作り直されたときは、同じ Intent をもう一度処理しない
+        // (ショートカットで開いた後に回すたび、バーコードの画面へ飛び直してしまう)
+        if (savedInstanceState == null) pendingIntent.value = intent
 
         // NFR-06: 起動時の自動バックアップの判定と期限の見回りは IO のスレッドで行い、画面を待たせない。
         // どれが失敗しても、アプリの起動は妨げない。
-        lifecycleScope.launch(Dispatchers.IO) {
-            runCatching { ShelfRepository.get(applicationContext).ensureDefaults() }
-            runCatching { AutoBackup.runIfDue(applicationContext) }
-            runCatching { DailyCheck.run(applicationContext) }
+        val app = applicationContext
+        startupScope.launch {
+            runCatching { ShelfRepository.get(app).ensureDefaults() }
+            runCatching { AutoBackup.runIfDue(app) }
+            runCatching { DailyCheck.run(app) }
             // 再起動でアラームは消えるので、開くたびに積み直す
-            runCatching { DailyCheckScheduler.schedule(applicationContext) }
+            runCatching { DailyCheckScheduler.schedule(app) }
         }
 
         setContent {
@@ -140,6 +151,13 @@ private fun AppShell(vm: ShelfViewModel, navController: NavHostController) {
     // FR-03 のアプリの中のバッジ: 少ない品目の数と、まだ買っていない行の数
     val lowCount = items.count { !it.isArchived && Stock.isLow(it) }
     val toBuy = shopping.count { !it.isChecked }
+
+    // 期限の表示の「今日」を、アプリに戻るたびと画面を移るたびに読み直す(日をまたいでも開いた日のままにしない)。
+    // 鍵の currentRoute が変わると見張りを付け直し、前面にいればすぐ ON_RESUME が届く
+    LifecycleResumeEffect(currentRoute) {
+        vm.refreshToday()
+        onPauseOrDispose { }
+    }
 
     Scaffold(
         bottomBar = {
